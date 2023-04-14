@@ -1,0 +1,44 @@
+#pragma once
+#include <memory>
+#include <stack>
+#include <unordered_map>
+#include <vector>
+
+namespace kupi {
+
+template<typename T, typename Alloc = std::allocator<T>>
+class MemoryCache {
+public:
+	MemoryCache() = default;
+	MemoryCache(MemoryCache const &rhs) = delete;
+	MemoryCache(MemoryCache &&rhs) noexcept = default;
+	MemoryCache &operator=(MemoryCache const &rhs) = delete;
+	MemoryCache &operator=(MemoryCache &&rhs) noexcept = default;
+	~MemoryCache() {
+		for (auto [id, p]: data) alloc.deallocate(p, 1);
+	}
+
+	T *operator[](int id) { return data[id]; }
+
+	void deallocate(int id) {
+		trash.push(id);
+	}
+	std::pair<int, T *> allocate() {
+		int id;
+		if (trash.empty()) id = data.size();
+		else {
+			id = trash.top();
+			trash.pop();
+		}
+		T *p = alloc.allocate(1);
+		data.insert({id, p});
+		return {id, p};
+	}
+
+private:
+	std::unordered_map<int, T *> data;
+	std::stack<int> trash;
+	Alloc alloc;
+};
+
+}// namespace kupi

@@ -1,5 +1,6 @@
 #pragma
 #include "bpt_exception.h"
+#include "cache/memory.h"
 #include <memory>
 #include <vector>
 
@@ -12,9 +13,11 @@ namespace kupi {
  * @tparam Alloc type of allocator
  * @attention one Key may have various values, but {key, value} is considered distinct.
  */
-template<typename Key, typename Val, template<typename Type> class Alloc = std::allocator>
+template<typename Key, typename Val, template<typename Type> class Array = MemoryCache>
 class bpt {
 public:
+	// TODO: construct function
+	// TODO: deconstruct function
 	bool insert(Key const &index, Val const &val);
 	bool erase(Key const &index, Val const &val);
 	std::vector<Val> find(Key const &index);
@@ -46,6 +49,7 @@ private:
 	struct leaf {
 		struct leaf_meta {
 			int size;
+			int last, next;
 		};
 		constexpr static int M = (BLOCK_SIZE - sizeof(leaf_meta)) / sizeof(pair);
 		leaf_meta header;
@@ -54,7 +58,9 @@ private:
 	};
 
 private:
-	node *rt;
+	// root is fixed as id 0
+	Array<node> alloc_node;
+	Array<leaf> alloc_leaf;
 };
 
 }// namespace kupi
