@@ -17,7 +17,7 @@ public:
 		for (auto [id, p]: data) alloc.deallocate(p, 1);
 	}
 
-	bool empty() { return data.size() >= trash.size(); }
+	bool empty() { return data.size() <= trash.size(); }
 	T *operator[](int id) { return data[id]; }
 
 	void deallocate(int id) {
@@ -25,7 +25,7 @@ public:
 	}
 	std::pair<int, T *> allocate() {
 		int id;
-		if (trash.empty()) id = data.size();
+		if (trash.empty()) id = data.size() + 1;
 		else {
 			id = trash.top();
 			trash.pop();

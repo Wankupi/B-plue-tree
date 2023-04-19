@@ -87,11 +87,11 @@ private:
 
 template<typename Key, typename Val, template<typename Type> class Array>
 std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
-	constexpr auto cmp_key_node = [](node::node_data const &A, node::node_data const &B) { return A.key.key < B.key.key; };
+	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key.key < B.key.key; };
 	constexpr auto cmp_key_leaf = [](pair const &A, pair const &B) { return A.key < B.key; };
 	if (leave.empty()) return {};
 	pair x{index, {}};
-	typename node::node_data X{x, 0};
+	node_data X{x, 0};
 	node *p = nodes.empty() ? nullptr : nodes[0];
 	leaf *ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
@@ -124,7 +124,7 @@ std::pair<int, typename bpt<Key, Val, Array>::leaf *> bpt<Key, Val, Array>::find
 		return {1, leave[1]};// tree is not empty
 	node_data X{x, 0};
 	node *p = nodes[1];
-	constexpr auto cmp_key_node = [](node::node_data const &A, node::node_data const &B) { return A.key < B.key; };
+	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key < B.key; };
 	while (true) {
 		auto k = std::lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
 		st.push_back({p, k});
@@ -143,7 +143,7 @@ template<typename Key, typename Val, template<typename Type> class Array>
 void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 	pair x{index, val};
 	if (leave.empty()) {
-		auto [id, p] = leave.allocate();// it's id must be 1, ensured by Alloc
+		auto [id, p] = leave.allocate();// it'seed id must be 1, ensured by Alloc
 		// memset(p, 0, sizeof(leaf));
 		p->header = leaf_meta{1, 0, 0};
 		p->data[0] = x;
