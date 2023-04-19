@@ -34,9 +34,6 @@ public:
 		data.insert({id, p});
 		return {id, p};
 	}
-	void swap(int id1, int id2) {
-		std::swap(data[id1], data[id2]);
-	}
 
 private:
 	std::unordered_map<int, T *> data;
