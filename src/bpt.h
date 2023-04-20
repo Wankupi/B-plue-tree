@@ -1,4 +1,4 @@
-#pragma
+#pragma once
 #include "bpt_exception.h"
 #include "cache/file.h"
 #include "cache/memory.h"
@@ -24,7 +24,12 @@ private:
 		friend bool operator<(pair const &lhs, pair const &rhs) {
 			return lhs.key == rhs.key ? lhs.val < rhs.val : lhs.key < rhs.key;
 		}
-		bool operator==(pair const &rhs) const = default;
+		friend bool operator==(pair const &lhs, pair const &rhs) {
+			return lhs.key == rhs.key && lhs.val == rhs.val;
+		}
+		friend bool operator!=(pair const &lhs, pair const &rhs) {
+			return lhs.key != rhs.key || lhs.val != rhs.val;
+		}
 	};
 	struct node_meta {
 		int size;
@@ -166,7 +171,7 @@ void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(int p_id, leaf_ptr p, pair const &x) {
+typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(int p_id, leaf_ptr p, pair const &x) {
 	auto k = std::lower_bound(p->data, p->end(), x);
 	if (k != p->end() && *k == x) return {0, nullptr};
 	pair last = k == p->end() ? x : p->back();// ==x might happen when p is the back leaf on the tree
@@ -187,7 +192,7 @@ bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(int p_id, 
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(node_ptr p, node_data *k, insert_result const &ir) {
+typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(node_ptr p, node_data *k, insert_result const &ir) {
 	node_data X{*ir.spilt_key, 0};
 	node_data last;
 	if (k != p->end()) {
@@ -262,7 +267,7 @@ void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, pair const &x) {
+typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, pair const &x) {
 	auto k = std::lower_bound(p->data, p->end(), x);
 	if (k == p->end() || *k != x) return {};
 	for (auto cur = k + 1; cur < p->end(); ++cur)
@@ -313,7 +318,7 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-bpt<Key, Val, Array>::reassign_result bpt<Key, Val, Array>::reassign_leaf(leaf_ptr p, pair &key, leaf_ptr q, int p_id) {
+typename bpt<Key, Val, Array>::reassign_result bpt<Key, Val, Array>::reassign_leaf(leaf_ptr p, pair &key, leaf_ptr q, int p_id) {
 	if (p->header.size + q->header.size > leaf::M) {
 		// average
 		int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
@@ -342,7 +347,7 @@ bpt<Key, Val, Array>::reassign_result bpt<Key, Val, Array>::reassign_leaf(leaf_p
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-bpt<Key, Val, Array>::reassign_result bpt<Key, Val, Array>::reassign_node(node_ptr p, pair &key, node_ptr q) {
+typename bpt<Key, Val, Array>::reassign_result bpt<Key, Val, Array>::reassign_node(node_ptr p, pair &key, node_ptr q) {
 	if (p->header.size + q->header.size >= node::M) {
 		// average
 		int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
