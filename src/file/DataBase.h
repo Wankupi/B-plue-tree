@@ -35,11 +35,12 @@ public:
      */
 	void erase(int id);
 	/**
-     * @return the number of datas in the file
+     * @return the number of datas currently being used
      */
 	int size();
 
 protected:
+	static constexpr int BLOCK_SIZE = (sizeof(Type) + 4095) / 4096 * 4096;
 	/**
      * @return the 1-indexed id of a usable place
      */
@@ -79,14 +80,14 @@ DataBase<Type, isTrash>::DataBase(const std::string &filename, emptyHook *hook)
 template<typename Type, bool isTrash>
 int DataBase<Type, isTrash>::insert(const Type &data) {
 	int id = newId();
-	file.seekp((id - 1) * sizeof(Type));
+	file.seekp((id - 1) * BLOCK_SIZE);
 	file.write(reinterpret_cast<char const *>(&data), sizeof(Type));
 	return id;
 }
 
 template<typename Type, bool isTrash>
 Type DataBase<Type, isTrash>::read(int id) {
-	file.seekg((id - 1) * sizeof(Type));
+	file.seekg((id - 1) * BLOCK_SIZE);
 	Type ret;
 	file.read(reinterpret_cast<char *>(&ret), sizeof(Type));
 	return ret;
@@ -94,7 +95,7 @@ Type DataBase<Type, isTrash>::read(int id) {
 
 template<typename Type, bool isTrash>
 void DataBase<Type, isTrash>::write(int id, const Type &data) {
-	file.seekp((id - 1) * sizeof(Type));
+	file.seekp((id - 1) * BLOCK_SIZE);
 	file.write(reinterpret_cast<char const *>(&data), sizeof(Type));
 }
 
@@ -102,7 +103,7 @@ template<typename Type, bool isTrash>
 int DataBase<Type, isTrash>::newId() {
 	auto size_nolock = [&file = this->file]() {
 		file.seekg(0, std::ios::end);
-		return file.tellg() / sizeof(Type);
+		return file.tellg() / BLOCK_SIZE;
 	};
 	if (!isTrash) return size_nolock() + 1;
 	int id = 0;
@@ -137,7 +138,9 @@ void DataBase<Type, isTrash>::erase(int id) {
 template<typename Type, bool isTrash>
 int DataBase<Type, isTrash>::size() {
 	file.seekg(0, std::ios::end);
-	return file.tellg() / sizeof(Type);
+	int count_blocks = (size_t(file.tellg()) + BLOCK_SIZE - 1) / BLOCK_SIZE, count_trash = 0;
+	trash.read(reinterpret_cast<char *>(&count_trash), sizeof(int));
+	return count_blocks - count_trash;
 }
 
 }// namespace kupi
