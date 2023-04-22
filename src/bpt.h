@@ -9,7 +9,7 @@
 
 namespace kupi {
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename Type> class Array = MemoryCache>
 class bpt {
 public:
 	void insert(Key const &index, Val const &val);
@@ -103,7 +103,7 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	if (leave.empty()) return {};
 	pair x{index, {}};
 	node_data X{x, 0};
-	auto p = nodes.empty() ? nullptr : nodes[0];
+	auto p = nodes.empty() ? nullptr : nodes[1];
 	auto ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
 		auto *k = std::lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
@@ -231,7 +231,7 @@ void bpt<Key, Val, Array>::insert_new_root(insert_result const &ir) {
 	}
 	else {
 		auto rt = nodes[1];
-		//		memcpy(q, rt, sizeof(node));
+		*q = *rt;
 		rt->header = node_meta{1, ir.new_node, false};
 		rt->data[0] = {*ir.spilt_key, id};
 	}
@@ -258,9 +258,12 @@ void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 		if (nodes.empty()) return;
 		node_ptr rt = st[0].first;
 		if (rt->header.size) return;
+		if (rt->header.is_leaf) {
+			nodes.deallocate(1);
+			return;
+		}
 		int old = rt->header.last_child;
 		auto q = nodes[old];
-		//		memcpy(rt, q, sizeof(node));
 		*rt = *q;
 		nodes.deallocate(old);
 	}
