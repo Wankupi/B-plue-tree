@@ -1,5 +1,6 @@
 #pragma once
 #include "file/DataBase.h"
+#include <unordered_map>
 namespace kupi {
 
 template<typename T>
@@ -64,9 +65,14 @@ public:
 	FileCache(std::string const &filename) : db(filename) {}
 	bool empty() { return db.size() == 0; }
 	CachePointer<T> operator[](int id) {
-		return {db.read(id), id, &db};
+		auto p = pool.find(id);
+		if (p != pool.end()) return p->second;
+		auto ptr = CachePointer<T>{db.read(id), id, &db};
+		pool.insert({id, ptr});
+		return ptr;
 	}
 	void deallocate(int id) {
+		pool.erase(id);
 		db.erase(id);
 	}
 	std::pair<int, CachePointer<T>> allocate() {
@@ -76,6 +82,7 @@ public:
 
 private:
 	DataBase<T, true> db;
+	std::unordered_map<int, CachePointer<T>> pool;
 };
 
 }// namespace kupi
