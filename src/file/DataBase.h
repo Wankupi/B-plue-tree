@@ -41,6 +41,7 @@ public:
 
 protected:
 	static constexpr int BLOCK_SIZE = (sizeof(Type) + 4095) / 4096 * 4096;
+	// static constexpr int BLOCK_SIZE = sizeof(Type);
 	/**
      * @return the 1-indexed id of a usable place
      */
@@ -66,7 +67,7 @@ DataBase<Type, isTrash>::DataBase(const std::string &filename, emptyHook *hook)
 	file.close();
 	file.open(filename, std::ios::in | std::ios::out | std::ios::binary);
 
-	if (isTrash) {
+	if constexpr (isTrash) {
 		trash.open(filename + ".trash", std::ios::binary | std::ios::app);
 		if (trash.tellp() == 0) {
 			int a = 0;
@@ -105,7 +106,7 @@ int DataBase<Type, isTrash>::newId() {
 		file.seekg(0, std::ios::end);
 		return file.tellg() / BLOCK_SIZE;
 	};
-	if (!isTrash) return size_nolock() + 1;
+	if constexpr (!isTrash) return size_nolock() + 1;
 	int id = 0;
 	trash.seekg(0);
 	int count_trash = 0;
@@ -124,7 +125,7 @@ int DataBase<Type, isTrash>::newId() {
 
 template<typename Type, bool isTrash>
 void DataBase<Type, isTrash>::erase(int id) {
-	if (!isTrash) return;
+	if constexpr (!isTrash) return;
 	trash.seekg(0);
 	int count_trash = 0;
 	trash.read(reinterpret_cast<char *>(&count_trash), sizeof(int));
@@ -139,6 +140,7 @@ template<typename Type, bool isTrash>
 int DataBase<Type, isTrash>::size() {
 	file.seekg(0, std::ios::end);
 	int count_blocks = (size_t(file.tellg()) + BLOCK_SIZE - 1) / BLOCK_SIZE, count_trash = 0;
+	trash.seekg(0);
 	trash.read(reinterpret_cast<char *>(&count_trash), sizeof(int));
 	return count_blocks - count_trash;
 }
