@@ -52,6 +52,7 @@ private:
 		int last, next;
 	};
 	struct leaf {
+		// at least M=3
 		constexpr static int M = (BLOCK_SIZE - sizeof(leaf_meta)) / sizeof(pair);
 		leaf_meta header;
 		pair data[M];
@@ -61,7 +62,6 @@ private:
 	};
 
 public:
-	std::pair<size_t, size_t> sizee() { return {sizeof(node), sizeof(leaf)}; }
 	bpt() = default;
 	bpt(std::string const &tr_name) : nodes(tr_name + ".nodes"), leave(tr_name + ".leave") {}
 
@@ -304,10 +304,10 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	}
 	int to_release = 0;
 	if (to_erase < p->end()) {
+		to_release = to_erase->child;
 		(to_erase - 1)->key = to_erase->key;
 		for (auto cur = to_erase + 1; cur < p->end(); ++cur) *(cur - 1) = *cur;
 		--(p->header.size);
-		to_release = to_erase->child;
 	}
 	else {
 		to_release = p->header.last_child;
@@ -317,7 +317,7 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	if (p->header.is_leaf) leave.deallocate(to_release);
 	else
 		nodes.deallocate(to_release);
-	return p->header.size < (node::M + 1) / 2;
+	return (p->header.size + 1) < (node::M + 2) / 2;
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>

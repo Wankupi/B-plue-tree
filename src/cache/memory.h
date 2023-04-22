@@ -24,12 +24,12 @@ public:
 		trash.push(id);
 	}
 	std::pair<int, T *> allocate() {
-		int id;
-		if (trash.empty()) id = data.size() + 1;
-		else {
-			id = trash.top();
+		if (!trash.empty()) {
+			int id = trash.top();
 			trash.pop();
+			return {id, data[id]};
 		}
+		int id = data.size() + 1;
 		T *p = alloc.allocate(1);
 		data.insert({id, p});
 		return {id, p};
