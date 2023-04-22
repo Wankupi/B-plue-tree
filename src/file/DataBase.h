@@ -102,11 +102,7 @@ void DataBase<Type, isTrash>::write(int id, const Type &data) {
 
 template<typename Type, bool isTrash>
 int DataBase<Type, isTrash>::newId() {
-	auto size_nolock = [&file = this->file]() {
-		file.seekg(0, std::ios::end);
-		return file.tellg() / BLOCK_SIZE;
-	};
-	if constexpr (!isTrash) return size_nolock() + 1;
+	if constexpr (!isTrash) return size() + 1;
 	int id = 0;
 	trash.seekg(0);
 	int count_trash = 0;
@@ -119,7 +115,7 @@ int DataBase<Type, isTrash>::newId() {
 		trash.write(reinterpret_cast<char *>(&count_trash), sizeof(int));
 	}
 	else
-		id = size_nolock() + 1;
+		id = size() + 1;
 	return id;
 }
 
