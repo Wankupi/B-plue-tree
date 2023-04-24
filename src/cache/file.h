@@ -1,88 +1,84 @@
 #pragma once
 #include "file/DataBase.h"
+#include <list>
 #include <unordered_map>
+#include <vector>
+
 namespace kupi {
 
 template<typename T>
-class CachePointer {
+class FileCache {
+	static constexpr int MAX_SIZE = 50;
+
 public:
-	CachePointer(nullptr_t) : ptr(nullptr) {}
-	CachePointer(T const &data, int id, DataBase<T, true> *db) : ptr(new Node(data, id, db)) {}
-	CachePointer(CachePointer const &rhs) : ptr(rhs.ptr) {
-		if (ptr) ++(ptr->cnt);
+	FileCache(std::string const &filename) : db(filename) {}
+	~FileCache() {
+		while (!que.empty())
+			delete pop();
+		for (int i: deletedIds)
+			db.erase(i);
 	}
-	CachePointer(CachePointer &&rhs) : ptr(rhs.ptr) { rhs.ptr = nullptr; }
-	~CachePointer() {
-		if (!ptr) return;
-		if (--(ptr->cnt)) {
-			ptr = nullptr;
-			return;
+	bool empty() { return db.size() - deletedIds.size() == 0; }
+
+	T *operator[](int id) {
+		Node n;
+		auto p = table.find(id);
+		if (p != table.end()) {
+			n = *p->second;
+			que.erase(p->second);
 		}
-		// if (ptr->stat == Node::Status::write)
-		ptr->db->write(ptr->id, ptr->data);
-		// else if (ptr->stat == Node::Status::erase)
-		// ptr->db->erase(ptr->id);
-		delete ptr;
-		ptr = nullptr;
+		else if (que.size() == MAX_SIZE)
+			n = load(id, pop());
+		else {
+			T *t = new T;
+			n = load(id, t);
+		}
+		que.push_back(n);
+		table[id] = --que.end();
+		return n.data;
 	}
-	CachePointer &operator=(CachePointer const &rhs) {
-		if (this == &rhs) return *this;
-		this->~CachePointer();
-		new (this) CachePointer(rhs);
-		return *this;
+
+	void deallocate(int id) {
+		deletedIds.push_back(id);
+		auto p = table.find(id);
+		if (p != table.end())
+			p->second->stat = 0;// no need to write anything
 	}
-	CachePointer &operator=(CachePointer &&rhs) {
-		if (this == &rhs) return *this;
-		this->~CachePointer();
-		new (this) CachePointer(std::move(rhs));
-		return *this;
+	std::pair<int, T *> allocate() {
+		int id;
+		if (!deletedIds.empty()) {
+			id = deletedIds.back();
+			deletedIds.pop_back();
+		}
+		else
+			id = db.insert({});
+		return {id, this->operator[](id)};
 	}
-	T *data() { return &ptr->data; }
-	T &operator*() { return ptr->data; }
-	T *operator->() { return &ptr->data; }
-	T const &operator*() const { return ptr->data; }
-	T const *operator->() const { return &ptr->data; }
-	explicit operator bool() const { return ptr; }
 
 private:
 	struct Node {
-		Node(T const &data, int id, DataBase<T, true> *db)
-			: data(data), cnt(1), id(id), db(db), stat(read) {}
-		T data;
-		int cnt;
 		int id;
-		DataBase<T, true> *db;
-		enum Status { read,
-					  write,
-					  erase } stat;
+		unsigned char stat;// 0:read only, 1:written
+		T *data;
 	};
-	Node *ptr;
-};
-
-template<typename T>
-class FileCache {
-public:
-	FileCache(std::string const &filename) : db(filename) {}
-	bool empty() { return db.size() == 0; }
-	CachePointer<T> operator[](int id) {
-		auto p = pool.find(id);
-		if (p != pool.end()) return p->second;
-		auto ptr = CachePointer<T>{db.read(id), id, &db};
-		pool.insert({id, ptr});
-		return ptr;
+	T *pop() {
+		Node nd = que.front();
+		que.pop_front();
+		table.erase(nd.id);
+		//		if (nd.stat)
+		db.write(nd.id, *nd.data);
+		return nd.data;
 	}
-	void deallocate(int id) {
-		pool.erase(id);
-		db.erase(id);
-	}
-	std::pair<int, CachePointer<T>> allocate() {
-		int id = db.insert({});
-		return {id, {{}, id, &db}};
+	Node load(int id, T *res) {
+		db.read(id, *res);
+		return {id, 0, res};
 	}
 
 private:
 	DataBase<T, true> db;
-	std::unordered_map<int, CachePointer<T>> pool;
+	std::list<Node> que;
+	std::unordered_map<int, typename std::list<Node>::iterator> table;
+	std::vector<int> deletedIds;
 };
 
 }// namespace kupi
