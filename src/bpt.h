@@ -147,7 +147,7 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, std::vector<std::pair<node_ptr, node_data *>> &st) {
+typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, std::vector<std::pair<node_ptr, node_data *>> &st) {
 	if (nodes.empty())
 		return leave[1];// tree is not empty
 	node_data X{x, 0};
