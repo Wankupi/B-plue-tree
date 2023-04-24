@@ -24,6 +24,7 @@ public:
      * @param id 1-indexed
      */
 	Type read(int id);
+	void read(int id, Type &res);
 	/**
      * @brief Write a Data to file
      * @param id 1-indexed
@@ -38,6 +39,7 @@ public:
      * @return the number of datas currently being used
      */
 	int size();
+	int capacity();
 
 protected:
 	static constexpr int BLOCK_SIZE = (sizeof(Type) + 4095) / 4096 * 4096;
@@ -88,10 +90,15 @@ int DataBase<Type, isTrash>::insert(const Type &data) {
 
 template<typename Type, bool isTrash>
 Type DataBase<Type, isTrash>::read(int id) {
-	file.seekg((id - 1) * BLOCK_SIZE);
 	Type ret;
-	file.read(reinterpret_cast<char *>(&ret), sizeof(Type));
+	read(id, ret);
 	return ret;
+}
+
+template<typename Type, bool isTrash>
+void DataBase<Type, isTrash>::read(int id, Type &res) {
+	file.seekg((id - 1) * BLOCK_SIZE);
+	file.read(reinterpret_cast<char *>(&res), sizeof(Type));
 }
 
 template<typename Type, bool isTrash>
@@ -134,11 +141,16 @@ void DataBase<Type, isTrash>::erase(int id) {
 
 template<typename Type, bool isTrash>
 int DataBase<Type, isTrash>::size() {
-	file.seekg(0, std::ios::end);
-	int count_blocks = (size_t(file.tellg()) + BLOCK_SIZE - 1) / BLOCK_SIZE, count_trash = 0;
+	int count_blocks = capacity(), count_trash = 0;
 	trash.seekg(0);
 	trash.read(reinterpret_cast<char *>(&count_trash), sizeof(int));
 	return count_blocks - count_trash;
+}
+
+template<typename Type, bool isTrash>
+int DataBase<Type, isTrash>::capacity() {
+	file.seekg(0, std::ios::end);
+	return (size_t(file.tellg()) + BLOCK_SIZE - 1) / BLOCK_SIZE;
 }
 
 }// namespace kupi
