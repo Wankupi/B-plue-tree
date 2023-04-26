@@ -2,10 +2,9 @@
 #include "bpt_exception.h"
 #include "cache/file.h"
 #include "cache/memory.h"
-#include <algorithm>
+#include "stlite/algorithm.h"
 #include <cstring>
 #include <memory>
-#include <vector>
 
 namespace kupi {
 
@@ -16,7 +15,7 @@ public:
 	bpt(std::string const &tr_name) : nodes(tr_name + ".nodes"), leave(tr_name + ".leave") {}
 	void insert(Key const &index, Val const &val);
 	void erase(Key const &index, Val const &val);
-	std::vector<Val> find(Key const &index);
+	vector<Val> find(Key const &index);
 
 private:
 	struct pair {
@@ -75,7 +74,7 @@ private:
 	 * @param st the nodes will be stored in it
 	 * @return pointer to the leaf where x should lay in. store the chain to it in a vector
 	 */
-	leaf_ptr find_leaf(pair const &x, std::vector<std::pair<node_ptr, node_data *>> &st);
+	leaf_ptr find_leaf(pair const &x, vector<std::pair<node_ptr, node_data *>> &st);
 
 	/**
 	 * The following 3 methods are called in insert.
@@ -114,7 +113,7 @@ private:
 };
 
 template<typename Key, typename Val, template<typename Type> class Array>
-std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
+vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key.key < B.key.key; };
 	constexpr auto cmp_key_leaf = [](pair const &A, pair const &B) { return A.key < B.key; };
 	if (leave.empty()) return {};
@@ -123,7 +122,7 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	auto p = nodes.empty() ? nullptr : nodes[1];
 	auto ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
-		auto *k = std::lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto *k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf) {
 			ptr = leave[next];
@@ -131,8 +130,8 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 		}
 		p = nodes[next];
 	}
-	std::vector<Val> res;
-	auto k = std::lower_bound(ptr->data, ptr->data + ptr->header.size, x, cmp_key_leaf);
+	vector<Val> res;
+	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, x, cmp_key_leaf);
 	while (ptr) {
 		while (k < ptr->data + ptr->header.size && index == k->key) {
 			res.emplace_back(k->val);
@@ -147,14 +146,14 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 }
 
 template<typename Key, typename Val, template<typename Type> class Array>
-typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, std::vector<std::pair<node_ptr, node_data *>> &st) {
+typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, vector<std::pair<node_ptr, node_data *>> &st) {
 	if (nodes.empty())
 		return leave[1];// tree is not empty
 	node_data X{x, 0};
 	node_ptr p = nodes[1];
 	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key < B.key; };
 	while (true) {
-		auto k = std::lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
 		st.push_back({p, k});
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf)
@@ -168,12 +167,12 @@ template<typename Key, typename Val, template<typename Type> class Array>
 void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 	pair x{index, val};
 	if (leave.empty()) {
-		auto [id, p] = leave.allocate(); // the first id is 1
+		auto [id, p] = leave.allocate();// the first id is 1
 		p->header = leaf_meta{1, 0};
 		p->data[0] = x;
 		return;
 	}
-	std::vector<std::pair<node_ptr, node_data *>> st;
+	vector<std::pair<node_ptr, node_data *>> st;
 	auto ptr = find_leaf(x, st);
 	auto ir = insert_leaf(ptr, x);
 	if (!ir.new_node) return;
@@ -185,7 +184,7 @@ void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 
 template<typename Key, typename Val, template<typename Type> class Array>
 typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(leaf_ptr p, pair const &x) {
-	auto k = std::lower_bound(p->data, p->end(), x);
+	auto k = lower_bound(p->data, p->end(), x);
 	if (k != p->end() && *k == x) return {0, nullptr};
 	pair last = k == p->end() ? x : p->back();// ==x might happen when p is the back leaf on the tree
 	for (auto cur = p->data + std::min(p->header.size, leaf::M - 1); cur > k; --cur)
@@ -253,7 +252,7 @@ template<typename Key, typename Val, template<typename Type> class Array>
 void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 	if (leave.empty()) return;
 	pair x{index, val};
-	std::vector<std::pair<node_ptr, node_data *>> st;
+	vector<std::pair<node_ptr, node_data *>> st;
 	auto ptr = find_leaf(x, st);
 	auto er = erase_leaf(ptr, x);
 	// deal with the change of key first
@@ -283,7 +282,7 @@ void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 
 template<typename Key, typename Val, template<typename Type> class Array>
 typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, pair const &x) {
-	auto k = std::lower_bound(p->data, p->end(), x);
+	auto k = lower_bound(p->data, p->end(), x);
 	if (k == p->end() || *k != x) return {};
 	for (auto cur = k + 1; cur < p->end(); ++cur)
 		*(cur - 1) = *cur;

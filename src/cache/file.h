@@ -1,5 +1,8 @@
 #pragma once
 #include "file/DataBase.h"
+#include "stlite/hash_table.h"
+#include "stlite/list.h"
+#include "stlite/vector.h"
 #include <list>
 #include <unordered_map>
 #include <vector>
@@ -65,7 +68,6 @@ private:
 		Node nd = que.front();
 		que.pop_front();
 		table.erase(nd.id);
-		//		if (nd.stat)
 		db.write(nd.id, *nd.data);
 		return nd.data;
 	}
@@ -76,9 +78,9 @@ private:
 
 private:
 	DataBase<T, true> db;
-	std::list<Node> que;
-	std::unordered_map<int, typename std::list<Node>::iterator> table;
-	std::vector<int> deletedIds;
+	list<Node> que;
+	unordered_map<int, typename list<Node>::iterator> table;
+	vector<int> deletedIds;
 };
 
 }// namespace kupi
