@@ -1,5 +1,5 @@
 #pragma once
-#include <utility> // to use std::pair
+#include <utility>// to use std::pair
 #ifdef USE_STL
 #include <unordered_map>
 namespace kupi {
@@ -28,6 +28,16 @@ public:
 		Node *nd = nullptr;
 	};
 	unordered_map() : array{new Node *[LEN] { nullptr }} {}
+	~unordered_map() {
+		for (int i = 0; i < LEN; ++i) {
+			while (array[i]) {
+				Node *t = array[i];
+				array[i] = t->next;
+				delete t;
+			}
+		}
+		delete[] array;
+	}
 	iterator end() { return {nullptr}; }
 	iterator find(Key const key) const {
 		Node *t = array[hash(key) & (LEN - 1)];

@@ -3,9 +3,6 @@
 #include "stlite/hash_table.h"
 #include "stlite/list.h"
 #include "stlite/vector.h"
-#include <list>
-#include <unordered_map>
-#include <vector>
 
 namespace kupi {
 
@@ -14,14 +11,16 @@ class FileCache {
 	static constexpr int MAX_SIZE = 50;
 
 public:
-	FileCache(std::string const &filename) : db(filename) {}
+	FileCache(std::string const &filename) : db(filename) {
+		db_size = db.size();
+	}
 	~FileCache() {
 		while (!que.empty())
 			delete pop();
 		for (int i: deletedIds)
 			db.erase(i);
 	}
-	bool empty() { return db.size() - deletedIds.size() == 0; }
+	bool empty() { return db_size - deletedIds.size() == 0; }
 
 	T *operator[](int id) {
 		Node n;
@@ -43,9 +42,6 @@ public:
 
 	void deallocate(int id) {
 		deletedIds.push_back(id);
-		auto p = table.find(id);
-		if (p != table.end())
-			p->second->stat = 0;// no need to write anything
 	}
 	std::pair<int, T *> allocate() {
 		int id;
@@ -53,15 +49,16 @@ public:
 			id = deletedIds.back();
 			deletedIds.pop_back();
 		}
-		else
+		else {
 			id = db.insert({});
+			++db_size;
+		}
 		return {id, this->operator[](id)};
 	}
 
 private:
 	struct Node {
 		int id;
-		unsigned char stat;// 0:read only, 1:written
 		T *data;
 	};
 	T *pop() {
@@ -73,7 +70,7 @@ private:
 	}
 	Node load(int id, T *res) {
 		db.read(id, *res);
-		return {id, 0, res};
+		return {id, res};
 	}
 
 private:
@@ -81,6 +78,7 @@ private:
 	list<Node> que;
 	unordered_map<int, typename list<Node>::iterator> table;
 	vector<int> deletedIds;
+	int db_size; // to reduce time on db.size()
 };
 
 }// namespace kupi
