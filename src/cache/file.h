@@ -16,29 +16,37 @@ public:
 		db_size = db.size();
 	}
 	~FileCache() {
-		while (!que.empty())
-			delete[] pop();
+		for (Node const &nd : que) {
+			flush_out(nd);
+			delete[] nd.data;
+		}
 		for (int i: deletedIds)
 			db.erase(i);
 	}
 	bool empty() { return db_size - deletedIds.size() == 0; }
 
 	T *operator[](int id) {
-		Node n;
-		auto p = table.find(id);
-		if (p != table.end()) {
-			n = *p->second;
-			que.erase(p->second);
+		if (auto p = table.find(id); p != table.end()) {
+			que.splice(que.end(), que, p->second);
+			return p->second->data;
 		}
-		else if (que.size() == MAX_SIZE)
-			n = load(id, pop());
+		if (que.size() == MAX_SIZE) {
+			auto p = que.begin();
+			que.splice(que.end(), que, p);
+			table.erase(p->id);
+			flush_out(*p);
+			p->id = id;
+			load(id, p->data);
+			table[id] = p;
+			return p->data;
+		}
 		else {
-			T *t = new T[2];
-			n = load(id, t);
+			T* dest = new T[2];
+			que.push_back({id, dest});
+			load(id, dest);
+			table[id] = --que.end();
+			return dest;
 		}
-		que.push_back(n);
-		table[id] = --que.end();
-		return n.data;
 	}
 
 	void deallocate(int id) {
@@ -62,18 +70,13 @@ private:
 		int id;
 		T *data;
 	};
-	T *pop() {
-		Node nd = que.front();
-		que.pop_front();
-		table.erase(nd.id);
+	void flush_out(Node const &nd) {
 		if (memcmp(nd.data, nd.data + 1, sizeof(T)))
 			db.write(nd.id, *nd.data);
-		return nd.data;
 	}
-	Node load(int id, T *res) {
+	void load(int id, T *res) {
 		db.read(id, *res);
 		memcpy(res + 1, res, sizeof(T));
-		return {id, res};
 	}
 
 private:

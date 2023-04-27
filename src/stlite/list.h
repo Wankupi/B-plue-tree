@@ -23,6 +23,11 @@ public:
 			it = it->last;
 			return *this;
 		}
+		bool operator!=(iterator const &rhs) const { return it != rhs.it; }
+		iterator &operator++() {
+			it = it->next;
+			return *this;
+		}
 	};
 
 public:
@@ -40,6 +45,7 @@ public:
 	[[nodiscard]] bool empty() const { return !siz; }
 	[[nodiscard]] size_t size() const { return siz; }
 	void erase(iterator it) { erase(it.it); }
+	iterator begin() const { return {head->next}; }
 	iterator end() const { return {tail}; }
 	T &front() { return head->next->data; }
 	void pop_front() { erase(head->next); }
@@ -47,6 +53,17 @@ public:
 		Node *nd = new Node{tail->last, tail, t};
 		tail->last->next = nd;
 		tail->last = nd;
+		++siz;
+	}
+
+	void splice(iterator const &ed, list &rhs, iterator const &it) {
+		Node *A = ed.it, *B = it.it;
+		B->last->next = B->next;
+		B->next->last = B->last;
+		--rhs.siz;
+		B->last = A->last;
+		B->next = A;
+		A->last = A->last->next = B;
 		++siz;
 	}
 
