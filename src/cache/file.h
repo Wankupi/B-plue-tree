@@ -3,6 +3,7 @@
 #include "stlite/hash_table.h"
 #include "stlite/list.h"
 #include "stlite/vector.h"
+#include <cstring>
 
 namespace kupi {
 
@@ -16,7 +17,7 @@ public:
 	}
 	~FileCache() {
 		while (!que.empty())
-			delete pop();
+			delete[] pop();
 		for (int i: deletedIds)
 			db.erase(i);
 	}
@@ -32,7 +33,7 @@ public:
 		else if (que.size() == MAX_SIZE)
 			n = load(id, pop());
 		else {
-			T *t = new T;
+			T *t = new T[2];
 			n = load(id, t);
 		}
 		que.push_back(n);
@@ -65,11 +66,13 @@ private:
 		Node nd = que.front();
 		que.pop_front();
 		table.erase(nd.id);
-		db.write(nd.id, *nd.data);
+		if (memcmp(nd.data, nd.data + 1, sizeof(T)))
+			db.write(nd.id, *nd.data);
 		return nd.data;
 	}
 	Node load(int id, T *res) {
 		db.read(id, *res);
+		memcpy(res + 1, res, sizeof(T));
 		return {id, res};
 	}
 
@@ -78,7 +81,7 @@ private:
 	list<Node> que;
 	unordered_map<int, typename list<Node>::iterator> table;
 	vector<int> deletedIds;
-	int db_size; // to reduce time on db.size()
+	int db_size;// to reduce time on db.size()
 };
 
 }// namespace kupi
