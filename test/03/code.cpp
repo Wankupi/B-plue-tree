@@ -1,7 +1,7 @@
-#define LOCAL_TEST
 #include "bpt.h"
 #include <array>
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <random>
 #include <set>
@@ -10,7 +10,6 @@ using namespace std;
 
 using bpt = kupi::bpt<int, int, kupi::FileCache>;
 
-void test_simple();
 void test_std();
 void test_input();
 
@@ -50,38 +49,34 @@ std::ostream &operator<<(std::ostream &os, std::set<std::pair<Key, Val>> const &
 
 
 int main() {
-	// test_std();
-	// test_simple();
-	test_input();
+	test_std();
+	//	test_input();
 	return 0;
-}
-
-void test_simple() {
-	bpt tr("03");
-	for (int i = 1; i <= 20; ++i) tr.insert(i, 0);
-	//	tr.print();
-	for (int i = 1; i <= 10; ++i) {
-		int k = (i + 3) % 10 + 1;
-		cout << "erase " << k << endl;
-		tr.erase(k, 0);
-		//		tr.print();
-	}
 }
 
 void test_std() {
 	//	std::default_random_engine e(std::chrono::system_clock::now().time_since_epoch().count());
 	std::default_random_engine e(12345);
-	int V = 200;
-	std::uniform_int_distribution opt(1, 4), x(0, V), y(0, V);
-	int n = 5000;
-	for (int T = 1; T <= 5000; ++T) {
-		//		if (T % 1000 == 0)
-		std::cout << "Case " << T << endl;
+	int V = 2000000;
+	std::uniform_int_distribution opt(1, 3), x(0, V), y(0, V);
+	int n = 1000000;
+
+	for (int T = 1; T <= 10; ++T) {
+		std::filesystem::remove("03.leave");
+		std::filesystem::remove("03.leave.trash");
+		std::filesystem::remove("03.nodes");
+		std::filesystem::remove("03.nodes.trash");
+		if (T % 100 == 0)
+			std::cout << "Case " << T << endl;
+		auto beg_time = std::chrono::system_clock::now();
 		bpt tr("03");
+		// kupi::bpt<int,int, kupi::MemoryCache> tr;
 		std::set<std::pair<int, int>> m;
 		bool fault = false;
 		std::vector<std::pair<int, std::pair<int, int>>> ops;
-		std::vector<int> v1, v2;
+		kupi::vector<int> v1;
+		std::vector<int> v2;
+
 		try {
 			for (int i = 1; i <= n; ++i) {
 				int o = opt(e);
@@ -102,7 +97,7 @@ void test_std() {
 					ops.push_back({o, {key, 0}});
 					v1 = tr.find(key);
 					v2 = find(m, key);
-					if (v1 != v2) {
+					if (std::vector<int>(v1) != v2) {
 						cout << "At Step " << i << endl;
 						fault = true;
 						break;
@@ -123,21 +118,31 @@ void test_std() {
 				else if (o == 3)
 					cout << "q " << key << endl;
 			}
-			cout << v1 << endl
+			cout << std::vector<int>(v1) << endl
 				 << v2 << endl;
 			break;
 		}
+
+		auto end_time = std::chrono::system_clock::now();
+		auto dur = end_time - beg_time;
+		std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << std::endl;
 	}
 }
 
 void test_input() {
+	std::filesystem::remove("03.leave");
+	std::filesystem::remove("03.leave.trash");
+	std::filesystem::remove("03.nodes");
+	std::filesystem::remove("03.nodes.trash");
+
 	bpt tr("03");
 	// kupi::bpt<int, int> tr;
 	std::set<std::pair<int, int>> m;
 	char opt[20];
 	int key, value;
-	while (cin >> opt >> key) {
+	while (cin >> opt) {
 		if (*opt == 'e') break;
+		cin >> key;
 		static int step = 0;
 		cout << "Step " << ++step << " \t[ \033[31m" << *opt << ' ' << key << "\033[0m ]" << endl;
 		if (*opt == 'i') {
@@ -152,12 +157,13 @@ void test_input() {
 			// tr.debug();
 		}
 		else {
-			auto v1 = tr.find(key), v2 = find(m, key);
-			std::cout << v1 << endl
+			auto v1 = tr.find(key);
+			auto v2 = find(m, key);
+			std::cout << std::vector<int>(v1) << endl
 					  << v2 << std::endl;
 			// if (v1 != v2) break;
 		}
-		tr.print();
+		//		tr.print();
 		cout << m;
 	}
 }
