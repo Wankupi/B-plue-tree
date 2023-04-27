@@ -33,11 +33,12 @@ public:
 		if (que.size() == MAX_SIZE) {
 			auto p = que.begin();
 			que.splice(que.end(), que, p);
-			table.erase(p->id);
+			auto nt = table.extract(p->id);
+			nt.key() = id;
+			table.insert(std::move(nt));
 			flush_out(*p);
 			p->id = id;
 			load(id, p->data);
-			table[id] = p;
 			return p->data;
 		}
 		else {

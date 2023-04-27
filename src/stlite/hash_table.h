@@ -18,6 +18,10 @@ class unordered_map {
 		std::pair<const Key, Val> x;
 		Node *next;
 	};
+	struct node_type {
+		Key &key() { return const_cast<Key &>(nd->x.first); }
+		Node *nd;
+	};
 
 public:
 	struct iterator {
@@ -54,16 +58,35 @@ public:
 		delete t;
 	}
 
-	Val &operator[](Key const &key) {
-		return insert(key)->x.second;
+	Val &operator[](Key const &key) { return insert_impl(key, {})->x.second; }
+
+	void insert(Key const &key, Val const &val) { insert_impl(key, val); }
+
+	node_type extract(Key const &key) {
+		Node **pre = array + (hash(key) & (LEN - 1));
+		Node *t = *pre;
+		while (t && t->x.first != key) t = *(pre = &t->next);
+		if (!t) return {nullptr};
+		*pre = t->next;
+		return {t};
+	}
+
+	void insert(node_type &&nt) {
+		Node **head = array + (hash(nt.key()) & (LEN - 1));
+		Node *t = *head;
+		while (t && t->x.first != nt.key()) t = t->next;
+		if (!t) {
+			*head = t = nt.nd;
+			nt.nd = nullptr;
+		}
 	}
 
 private:
-	Node *insert(Key const &key) {
+	Node *insert_impl(Key const &key, Val const &val) {
 		Node **head = array + (hash(key) & (LEN - 1));
 		Node *t = *head;
 		while (t && t->x.first != key) t = t->next;
-		if (!t) *head = t = new Node{{key, {}}, *head};
+		if (!t) *head = t = new Node{{key, val}, *head};
 		return t;
 	}
 
