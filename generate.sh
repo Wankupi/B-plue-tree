@@ -1,7 +1,6 @@
 #!/bin/bash
 
-src_files=("src/bpt_exception.h"
-	"src/stlite/algorithm.h"
+src_files=("src/stlite/algorithm.h"
 	"src/stlite/hash_table.h"
 	"src/stlite/list.h"
 	"src/stlite/vector.h"

@@ -1,5 +1,4 @@
 #pragma once
-#include "bpt_exception.h"
 #include "cache/file.h"
 #include "cache/memory.h"
 #include "stlite/algorithm.h"
@@ -8,7 +7,7 @@
 
 namespace kupi {
 
-template<typename Key, typename Val, template<typename Type> class Array = MemoryCache>
+template<typename Key, typename Val, template<typename> class Array = MemoryCache>
 class bpt {
 public:
 	bpt() = default;
@@ -112,7 +111,7 @@ private:
 	reassign_method reassign(int p, pair &key, int q, bool is_leaf) { return is_leaf ? reassign_leaf(leave[p], key, leave[q]) : reassign_node(nodes[p], key, nodes[q]); }
 };
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key.key < B.key.key; };
 	constexpr auto cmp_key_leaf = [](pair const &A, pair const &B) { return A.key < B.key; };
@@ -145,7 +144,7 @@ vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	return res;
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, vector<std::pair<node_ptr, node_data *>> &st) {
 	if (nodes.empty())
 		return leave[1];// tree is not empty
@@ -163,7 +162,7 @@ typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair con
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 	pair x{index, val};
 	if (leave.empty()) {
@@ -182,7 +181,7 @@ void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 		insert_new_root(ir);
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(leaf_ptr p, pair const &x) {
 	auto k = lower_bound(p->data, p->end(), x);
 	if (k != p->end() && *k == x) return {0, nullptr};
@@ -201,7 +200,7 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(l
 	return {q_id, &p->back()};
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(node_ptr p, node_data *k, insert_result const &ir) {
 	node_data X{*ir.spilt_key, 0};
 	node_data last;
@@ -230,7 +229,7 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(n
 	return {id, &p->data[A].key};
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 void bpt<Key, Val, Array>::insert_new_root(insert_result const &ir) {
 	bool is_leaf = nodes.empty();
 	auto [id, q] = nodes.allocate();
@@ -246,7 +245,7 @@ void bpt<Key, Val, Array>::insert_new_root(insert_result const &ir) {
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 	if (leave.empty()) return;
 	pair x{index, val};
@@ -278,7 +277,7 @@ void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, pair const &x) {
 	auto k = lower_bound(p->data, p->end(), x);
 	if (k == p->end() || *k != x) return {};
@@ -288,7 +287,7 @@ typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(lea
 	return {back, p->header.size < (leaf::M + 1) / 2};
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	auto get_size = [this, is_leaf = p->header.is_leaf](int id) {
 		if (!id) return 0;
@@ -328,7 +327,7 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	return (p->header.size + 1) < (node::M + 2) / 2;
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_leaf(leaf_ptr p, pair &key, leaf_ptr q) {
 	if (p->header.size + q->header.size > leaf::M) {
 		// average
@@ -356,7 +355,7 @@ typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_le
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_node(node_ptr p, pair &key, node_ptr q) {
 	if (p->header.size + q->header.size >= node::M) {
 		// average

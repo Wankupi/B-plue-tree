@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #ifdef USE_STL
 #include <list>
 namespace kupi {

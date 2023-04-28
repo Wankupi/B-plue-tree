@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <utility>// to use std::pair
 #ifdef USE_STL
 #include <unordered_map>
