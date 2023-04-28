@@ -1,22 +1,20 @@
 #pragma once
-#include "bpt_exception.h"
 #include "cache/file.h"
 #include "cache/memory.h"
-#include <algorithm>
+#include "stlite/algorithm.h"
 #include <cstring>
 #include <memory>
-#include <vector>
 
 namespace kupi {
 
-template<typename Key, typename Val, template<typename Type> class Array = MemoryCache>
+template<typename Key, typename Val, template<typename> class Array = MemoryCache>
 class bpt {
 public:
 	bpt() = default;
 	bpt(std::string const &tr_name) : nodes(tr_name + ".nodes"), leave(tr_name + ".leave") {}
 	void insert(Key const &index, Val const &val);
 	void erase(Key const &index, Val const &val);
-	std::vector<Val> find(Key const &index);
+	vector<Val> find(Key const &index);
 
 private:
 	struct pair {
@@ -75,7 +73,7 @@ private:
 	 * @param st the nodes will be stored in it
 	 * @return pointer to the leaf where x should lay in. store the chain to it in a vector
 	 */
-	leaf_ptr find_leaf(pair const &x, std::vector<std::pair<node_ptr, node_data *>> &st);
+	leaf_ptr find_leaf(pair const &x, vector<std::pair<node_ptr, node_data *>> &st);
 
 	/**
 	 * The following 3 methods are called in insert.
@@ -113,8 +111,8 @@ private:
 	reassign_method reassign(int p, pair &key, int q, bool is_leaf) { return is_leaf ? reassign_leaf(leave[p], key, leave[q]) : reassign_node(nodes[p], key, nodes[q]); }
 };
 
-template<typename Key, typename Val, template<typename Type> class Array>
-std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
+template<typename Key, typename Val, template<typename> class Array>
+vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key.key < B.key.key; };
 	constexpr auto cmp_key_leaf = [](pair const &A, pair const &B) { return A.key < B.key; };
 	if (leave.empty()) return {};
@@ -123,7 +121,7 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	auto p = nodes.empty() ? nullptr : nodes[1];
 	auto ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
-		auto *k = std::lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto *k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf) {
 			ptr = leave[next];
@@ -131,8 +129,8 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 		}
 		p = nodes[next];
 	}
-	std::vector<Val> res;
-	auto k = std::lower_bound(ptr->data, ptr->data + ptr->header.size, x, cmp_key_leaf);
+	vector<Val> res;
+	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, x, cmp_key_leaf);
 	while (ptr) {
 		while (k < ptr->data + ptr->header.size && index == k->key) {
 			res.emplace_back(k->val);
@@ -146,15 +144,15 @@ std::vector<Val> bpt<Key, Val, Array>::find(Key const &index) {
 	return res;
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
-typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, std::vector<std::pair<node_ptr, node_data *>> &st) {
+template<typename Key, typename Val, template<typename> class Array>
+typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair const &x, vector<std::pair<node_ptr, node_data *>> &st) {
 	if (nodes.empty())
 		return leave[1];// tree is not empty
 	node_data X{x, 0};
 	node_ptr p = nodes[1];
 	constexpr auto cmp_key_node = [](node_data const &A, node_data const &B) { return A.key < B.key; };
 	while (true) {
-		auto k = std::lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
 		st.push_back({p, k});
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf)
@@ -164,16 +162,16 @@ typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(pair con
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 	pair x{index, val};
 	if (leave.empty()) {
-		auto [id, p] = leave.allocate(); // the first id is 1
+		auto [id, p] = leave.allocate();// the first id is 1
 		p->header = leaf_meta{1, 0};
 		p->data[0] = x;
 		return;
 	}
-	std::vector<std::pair<node_ptr, node_data *>> st;
+	vector<std::pair<node_ptr, node_data *>> st;
 	auto ptr = find_leaf(x, st);
 	auto ir = insert_leaf(ptr, x);
 	if (!ir.new_node) return;
@@ -183,13 +181,13 @@ void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 		insert_new_root(ir);
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(leaf_ptr p, pair const &x) {
-	auto k = std::lower_bound(p->data, p->end(), x);
+	auto k = lower_bound(p->data, p->end(), x);
 	if (k != p->end() && *k == x) return {0, nullptr};
 	pair last = k == p->end() ? x : p->back();// ==x might happen when p is the back leaf on the tree
-	for (auto cur = p->data + std::min(p->header.size, leaf::M - 1); cur > k; --cur)
-		*cur = *(cur - 1);
+	if (int count = (p->data + std::min(p->header.size, leaf::M - 1) - k); count > 0)
+		memmove(k + 1, k, count * sizeof(pair));
 	if (p->header.size < leaf::M || k != p->end())
 		*k = x;
 	if (++(p->header.size) <= leaf::M) return {0, nullptr};
@@ -197,13 +195,12 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(l
 	auto [q_id, q] = leave.allocate();
 	q->header = leaf_meta{B, p->header.next};
 	p->header = leaf_meta{A, q_id};
-	for (int i = A; i < leaf::M; ++i)
-		q->data[i - A] = p->data[i];
+	memcpy(q->data, p->data + A, (leaf::M - A) * sizeof(pair));
 	q->data[B - 1] = last;
 	return {q_id, &p->back()};
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(node_ptr p, node_data *k, insert_result const &ir) {
 	node_data X{*ir.spilt_key, 0};
 	node_data last;
@@ -217,8 +214,8 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(n
 		p->header.last_child = ir.new_node;
 		last = X;
 	}
-	for (auto cur = p->header.size == node::M ? p->end() - 1 : p->end(); cur > k; --cur)
-		*cur = *(cur - 1);
+	if (int count = (p->header.size == node::M ? p->end() - 1 : p->end()) - k; count > 0)
+		memmove(k + 1, k, count * sizeof(node_data));
 	if (p->header.size < node::M || k != p->end())
 		*k = X;
 	if (++(p->header.size) <= node::M) return {0};
@@ -226,14 +223,13 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(n
 	auto [id, q] = nodes.allocate();
 	q->header = node_meta{B, p->header.last_child, p->header.is_leaf};
 	p->header = node_meta{A, p->data[A].child, p->header.is_leaf};
-	for (int i = A + 1; i < node::M; ++i)
-		q->data[i - A - 1] = p->data[i];
+	memcpy(q->data, p->data + A + 1, (node::M - A - 1) * sizeof(node_data));
 	q->data[B - 1] = last;
-	// return reference is not very safe... just do it in memory for convenience
+	// return reference is not very safe. require cache support
 	return {id, &p->data[A].key};
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 void bpt<Key, Val, Array>::insert_new_root(insert_result const &ir) {
 	bool is_leaf = nodes.empty();
 	auto [id, q] = nodes.allocate();
@@ -249,11 +245,11 @@ void bpt<Key, Val, Array>::insert_new_root(insert_result const &ir) {
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 	if (leave.empty()) return;
 	pair x{index, val};
-	std::vector<std::pair<node_ptr, node_data *>> st;
+	vector<std::pair<node_ptr, node_data *>> st;
 	auto ptr = find_leaf(x, st);
 	auto er = erase_leaf(ptr, x);
 	// deal with the change of key first
@@ -281,18 +277,17 @@ void bpt<Key, Val, Array>::erase(const Key &index, const Val &val) {
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, pair const &x) {
-	auto k = std::lower_bound(p->data, p->end(), x);
+	auto k = lower_bound(p->data, p->end(), x);
 	if (k == p->end() || *k != x) return {};
-	for (auto cur = k + 1; cur < p->end(); ++cur)
-		*(cur - 1) = *cur;
+	memmove(k, k + 1, (p->end() - k - 1) * sizeof(pair));
 	--(p->header.size);
 	pair const *back = (k == p->end() ? &p->back() : nullptr);
 	return {back, p->header.size < (leaf::M + 1) / 2};
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	auto get_size = [this, is_leaf = p->header.is_leaf](int id) {
 		if (!id) return 0;
@@ -318,7 +313,7 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	if (to_erase < p->end()) {
 		to_release = to_erase->child;
 		(to_erase - 1)->key = to_erase->key;
-		for (auto cur = to_erase + 1; cur < p->end(); ++cur) *(cur - 1) = *cur;
+		memmove(to_erase, to_erase + 1, (p->end() - to_erase - 1) * sizeof(node_data));
 		--(p->header.size);
 	}
 	else {
@@ -332,20 +327,20 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	return (p->header.size + 1) < (node::M + 2) / 2;
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_leaf(leaf_ptr p, pair &key, leaf_ptr q) {
 	if (p->header.size + q->header.size > leaf::M) {
 		// average
-		int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
+		const int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
 		// assert(A != p->header.size);
 		// assert(B != q->header.size);
-		for (int i = p->header.size; i < A; ++i) p->data[i] = q->data[i - p->header.size];
+		if (A - p->header.size > 0) memcpy(p->data + p->header.size, q->data, (A - p->header.size) * sizeof(pair));
 		if (q->header.size < B) {
-			for (int i = 1; i <= q->header.size; ++i) q->data[B - i] = q->data[q->header.size - i];
-			for (int i = 0; i < B - q->header.size; ++i) q->data[i] = p->data[A + i];
+			memmove(q->data + B - q->header.size, q->data, q->header.size * sizeof(pair));
+			memcpy(q->data, p->data + A, (B - q->header.size) * sizeof(pair));
 		}
 		else
-			for (int i = 0; i < B; ++i) q->data[i] = q->data[q->header.size - B + i];
+			memmove(q->data, q->data + q->header.size - B, B * sizeof(pair));
 		p->header.size = A;
 		q->header.size = B;
 		key = p->back();
@@ -353,28 +348,28 @@ typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_le
 	}
 	else {
 		// merge
-		for (int i = 0; i < q->header.size; ++i) p->data[p->header.size + i] = q->data[i];
+		memcpy(p->data + p->header.size, q->data, q->header.size * sizeof(pair));
 		p->header.size += q->header.size;
 		p->header.next = q->header.next;
 		return reassign_method::merge;
 	}
 }
 
-template<typename Key, typename Val, template<typename Type> class Array>
+template<typename Key, typename Val, template<typename> class Array>
 typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_node(node_ptr p, pair &key, node_ptr q) {
 	if (p->header.size + q->header.size >= node::M) {
 		// average
 		int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
 		if (A > p->header.size) {
 			p->data[p->header.size] = {key, p->header.last_child};
-			for (int i = p->header.size + 1; i < A; ++i) p->data[i] = q->data[i - p->header.size - 1];
+			memcpy(p->data + p->header.size + 1, q->data, (A - p->header.size - 1) * sizeof(node_data));
 			p->header.last_child = q->data[q->header.size - B - 1].child;
 			key = q->data[q->header.size - B - 1].key;
-			for (int i = 0; i < B; ++i) q->data[i] = q->data[q->header.size - B + i];
+			memmove(q->data, q->data + q->header.size - B, B * sizeof(node_data));
 		}
 		else {
-			for (int i = 1; i <= q->header.size; ++i) q->data[B - i] = q->data[q->header.size - i];
-			for (int i = A + 1; i < p->header.size; ++i) q->data[i - A - 1] = p->data[i];
+			memmove(q->data + B - q->header.size, q->data, (q->header.size) * sizeof(node_data));
+			memcpy(q->data, p->data + A + 1, (p->header.size - A - 1) * sizeof(node_data));
 			q->data[p->header.size - A - 1] = {key, p->header.last_child};
 			p->header.last_child = p->data[A].child;
 			key = p->data[A].key;
@@ -386,7 +381,7 @@ typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_no
 	else {
 		// merge
 		p->data[p->header.size] = {key, p->header.last_child};
-		for (int i = 0; i < q->header.size; ++i) p->data[p->header.size + i + 1] = q->data[i];
+		memcpy(p->data + p->header.size + 1, q->data, q->header.size * sizeof(node_data));
 		p->header.size += q->header.size + 1;
 		p->header.last_child = q->header.last_child;
 		return reassign_method::merge;

@@ -1,8 +1,9 @@
 #pragma once
 #include "file/DataBase.h"
-#include <list>
-#include <unordered_map>
-#include <vector>
+#include "stlite/hash_table.h"
+#include "stlite/list.h"
+#include "stlite/vector.h"
+#include <cstring>
 
 namespace kupi {
 
@@ -11,38 +12,46 @@ class FileCache {
 	static constexpr int MAX_SIZE = 50;
 
 public:
-	FileCache(std::string const &filename) : db(filename) {}
+	FileCache(std::string const &filename) : db(filename) {
+		db_size = db.size();
+	}
 	~FileCache() {
-		while (!que.empty())
-			delete pop();
+		for (Node const &nd : que) {
+			flush_out(nd);
+			delete[] nd.data;
+		}
 		for (int i: deletedIds)
 			db.erase(i);
 	}
-	bool empty() { return db.size() - deletedIds.size() == 0; }
+	bool empty() { return db_size - deletedIds.size() == 0; }
 
 	T *operator[](int id) {
-		Node n;
-		auto p = table.find(id);
-		if (p != table.end()) {
-			n = *p->second;
-			que.erase(p->second);
+		if (auto p = table.find(id); p != table.end()) {
+			que.splice(que.end(), que, p->second);
+			return p->second->data;
 		}
-		else if (que.size() == MAX_SIZE)
-			n = load(id, pop());
+		if (que.size() == MAX_SIZE) {
+			auto p = que.begin();
+			que.splice(que.end(), que, p);
+			auto nt = table.extract(p->id);
+			nt.key() = id;
+			table.insert(std::move(nt));
+			flush_out(*p);
+			p->id = id;
+			load(id, p->data);
+			return p->data;
+		}
 		else {
-			T *t = new T;
-			n = load(id, t);
+			T* dest = new T[2];
+			que.push_back({id, dest});
+			load(id, dest);
+			table[id] = --que.end();
+			return dest;
 		}
-		que.push_back(n);
-		table[id] = --que.end();
-		return n.data;
 	}
 
 	void deallocate(int id) {
 		deletedIds.push_back(id);
-		auto p = table.find(id);
-		if (p != table.end())
-			p->second->stat = 0;// no need to write anything
 	}
 	std::pair<int, T *> allocate() {
 		int id;
@@ -50,35 +59,33 @@ public:
 			id = deletedIds.back();
 			deletedIds.pop_back();
 		}
-		else
+		else {
 			id = db.insert({});
+			++db_size;
+		}
 		return {id, this->operator[](id)};
 	}
 
 private:
 	struct Node {
 		int id;
-		unsigned char stat;// 0:read only, 1:written
 		T *data;
 	};
-	T *pop() {
-		Node nd = que.front();
-		que.pop_front();
-		table.erase(nd.id);
-		//		if (nd.stat)
-		db.write(nd.id, *nd.data);
-		return nd.data;
+	void flush_out(Node const &nd) {
+		if (memcmp(nd.data, nd.data + 1, sizeof(T)))
+			db.write(nd.id, *nd.data);
 	}
-	Node load(int id, T *res) {
+	void load(int id, T *res) {
 		db.read(id, *res);
-		return {id, 0, res};
+		memcpy(res + 1, res, sizeof(T));
 	}
 
 private:
 	DataBase<T, true> db;
-	std::list<Node> que;
-	std::unordered_map<int, typename std::list<Node>::iterator> table;
-	std::vector<int> deletedIds;
+	list<Node> que;
+	unordered_map<int, typename list<Node>::iterator> table;
+	vector<int> deletedIds;
+	int db_size;// to reduce time on db.size()
 };
 
 }// namespace kupi

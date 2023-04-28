@@ -1,5 +1,4 @@
 #pragma once
-#include "bpt_exception.h"
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -64,7 +63,7 @@ DataBase<Type, isTrash>::DataBase(const std::string &filename, emptyHook *hook)
 	}
 	file.open(filename, std::ios::app);
 	if (!file)
-		throw bpt_exception("file: failed to open file.");
+		throw "file: failed to open file.";
 	if (file.tellp() == 0 && hook) hook(file);
 	file.close();
 	file.open(filename, std::ios::in | std::ios::out | std::ios::binary);
