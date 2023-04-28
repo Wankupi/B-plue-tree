@@ -187,8 +187,8 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(l
 	auto k = lower_bound(p->data, p->end(), x);
 	if (k != p->end() && *k == x) return {0, nullptr};
 	pair last = k == p->end() ? x : p->back();// ==x might happen when p is the back leaf on the tree
-	for (auto cur = p->data + std::min(p->header.size, leaf::M - 1); cur > k; --cur)
-		*cur = *(cur - 1);
+	if (int count = (p->data + std::min(p->header.size, leaf::M - 1) - k); count > 0)
+		memmove(k + 1, k, count * sizeof(pair));
 	if (p->header.size < leaf::M || k != p->end())
 		*k = x;
 	if (++(p->header.size) <= leaf::M) return {0, nullptr};
@@ -196,8 +196,7 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_leaf(l
 	auto [q_id, q] = leave.allocate();
 	q->header = leaf_meta{B, p->header.next};
 	p->header = leaf_meta{A, q_id};
-	for (int i = A; i < leaf::M; ++i)
-		q->data[i - A] = p->data[i];
+	memcpy(q->data, p->data + A, (leaf::M - A) * sizeof(pair));
 	q->data[B - 1] = last;
 	return {q_id, &p->back()};
 }
@@ -216,8 +215,8 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(n
 		p->header.last_child = ir.new_node;
 		last = X;
 	}
-	for (auto cur = p->header.size == node::M ? p->end() - 1 : p->end(); cur > k; --cur)
-		*cur = *(cur - 1);
+	if (int count = (p->header.size == node::M ? p->end() - 1 : p->end()) - k; count > 0)
+		memmove(k + 1, k, count * sizeof(node_data));
 	if (p->header.size < node::M || k != p->end())
 		*k = X;
 	if (++(p->header.size) <= node::M) return {0};
@@ -225,10 +224,9 @@ typename bpt<Key, Val, Array>::insert_result bpt<Key, Val, Array>::insert_node(n
 	auto [id, q] = nodes.allocate();
 	q->header = node_meta{B, p->header.last_child, p->header.is_leaf};
 	p->header = node_meta{A, p->data[A].child, p->header.is_leaf};
-	for (int i = A + 1; i < node::M; ++i)
-		q->data[i - A - 1] = p->data[i];
+	memcpy(q->data, p->data + A + 1, (node::M - A - 1) * sizeof(node_data));
 	q->data[B - 1] = last;
-	// return reference is not very safe... just do it in memory for convenience
+	// return reference is not very safe. require cache support
 	return {id, &p->data[A].key};
 }
 
@@ -284,8 +282,7 @@ template<typename Key, typename Val, template<typename Type> class Array>
 typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, pair const &x) {
 	auto k = lower_bound(p->data, p->end(), x);
 	if (k == p->end() || *k != x) return {};
-	for (auto cur = k + 1; cur < p->end(); ++cur)
-		*(cur - 1) = *cur;
+	memmove(k, k + 1, (p->end() - k - 1) * sizeof(pair));
 	--(p->header.size);
 	pair const *back = (k == p->end() ? &p->back() : nullptr);
 	return {back, p->header.size < (leaf::M + 1) / 2};
@@ -317,7 +314,7 @@ bool bpt<Key, Val, Array>::erase_node(node_ptr p, node_data *k) {
 	if (to_erase < p->end()) {
 		to_release = to_erase->child;
 		(to_erase - 1)->key = to_erase->key;
-		for (auto cur = to_erase + 1; cur < p->end(); ++cur) *(cur - 1) = *cur;
+		memmove(to_erase, to_erase + 1, (p->end() - to_erase - 1) * sizeof(node_data));
 		--(p->header.size);
 	}
 	else {
@@ -335,16 +332,16 @@ template<typename Key, typename Val, template<typename Type> class Array>
 typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_leaf(leaf_ptr p, pair &key, leaf_ptr q) {
 	if (p->header.size + q->header.size > leaf::M) {
 		// average
-		int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
+		const int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
 		// assert(A != p->header.size);
 		// assert(B != q->header.size);
-		for (int i = p->header.size; i < A; ++i) p->data[i] = q->data[i - p->header.size];
+		if (A - p->header.size > 0) memcpy(p->data + p->header.size, q->data, (A - p->header.size) * sizeof(pair));
 		if (q->header.size < B) {
-			for (int i = 1; i <= q->header.size; ++i) q->data[B - i] = q->data[q->header.size - i];
-			for (int i = 0; i < B - q->header.size; ++i) q->data[i] = p->data[A + i];
+			memmove(q->data + B - q->header.size, q->data, q->header.size * sizeof(pair));
+			memcpy(q->data, p->data + A, (B - q->header.size) * sizeof(pair));
 		}
 		else
-			for (int i = 0; i < B; ++i) q->data[i] = q->data[q->header.size - B + i];
+			memmove(q->data, q->data + q->header.size - B, B * sizeof(pair));
 		p->header.size = A;
 		q->header.size = B;
 		key = p->back();
@@ -352,7 +349,7 @@ typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_le
 	}
 	else {
 		// merge
-		for (int i = 0; i < q->header.size; ++i) p->data[p->header.size + i] = q->data[i];
+		memcpy(p->data + p->header.size, q->data, q->header.size * sizeof(pair));
 		p->header.size += q->header.size;
 		p->header.next = q->header.next;
 		return reassign_method::merge;
@@ -366,14 +363,14 @@ typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_no
 		int A = (p->header.size + q->header.size + 1) / 2, B = p->header.size + q->header.size - A;
 		if (A > p->header.size) {
 			p->data[p->header.size] = {key, p->header.last_child};
-			for (int i = p->header.size + 1; i < A; ++i) p->data[i] = q->data[i - p->header.size - 1];
+			memcpy(p->data + p->header.size + 1, q->data, (A - p->header.size - 1) * sizeof(node_data));
 			p->header.last_child = q->data[q->header.size - B - 1].child;
 			key = q->data[q->header.size - B - 1].key;
-			for (int i = 0; i < B; ++i) q->data[i] = q->data[q->header.size - B + i];
+			memmove(q->data, q->data + q->header.size - B, B * sizeof(node_data));
 		}
 		else {
-			for (int i = 1; i <= q->header.size; ++i) q->data[B - i] = q->data[q->header.size - i];
-			for (int i = A + 1; i < p->header.size; ++i) q->data[i - A - 1] = p->data[i];
+			memmove(q->data + B - q->header.size, q->data, (q->header.size) * sizeof(node_data));
+			memcpy(q->data, p->data + A + 1, (p->header.size - A - 1) * sizeof(node_data));
 			q->data[p->header.size - A - 1] = {key, p->header.last_child};
 			p->header.last_child = p->data[A].child;
 			key = p->data[A].key;
@@ -385,7 +382,7 @@ typename bpt<Key, Val, Array>::reassign_method bpt<Key, Val, Array>::reassign_no
 	else {
 		// merge
 		p->data[p->header.size] = {key, p->header.last_child};
-		for (int i = 0; i < q->header.size; ++i) p->data[p->header.size + i + 1] = q->data[i];
+		memcpy(p->data + p->header.size + 1, q->data, q->header.size * sizeof(node_data));
 		p->header.size += q->header.size + 1;
 		p->header.last_child = q->header.last_child;
 		return reassign_method::merge;
