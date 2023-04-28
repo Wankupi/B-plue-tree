@@ -57,11 +57,11 @@ int main() {
 void test_std() {
 	//	std::default_random_engine e(std::chrono::system_clock::now().time_since_epoch().count());
 	std::default_random_engine e(12345);
-	int V = 2000000;
+	int V = 500;
 	std::uniform_int_distribution opt(1, 3), x(0, V), y(0, V);
-	int n = 1000000;
+	int n = 1000;
 
-	for (int T = 1; T <= 10; ++T) {
+	for (int T = 1; T <= 5000; ++T) {
 		std::filesystem::remove("03.leave");
 		std::filesystem::remove("03.leave.trash");
 		std::filesystem::remove("03.nodes");
@@ -81,7 +81,6 @@ void test_std() {
 			for (int i = 1; i <= n; ++i) {
 				int o = opt(e);
 				int key = x(e);
-				//				int value = y(e);
 				int value = 0;
 				if (o == 1) {
 					ops.push_back({o, {key, value}});
@@ -125,7 +124,7 @@ void test_std() {
 
 		auto end_time = std::chrono::system_clock::now();
 		auto dur = end_time - beg_time;
-		std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << std::endl;
+		//		std::cout << "time: " << std::chrono::duration_cast<std::chrono::milliseconds>(dur).count() << "ms" << std::endl;
 	}
 }
 
