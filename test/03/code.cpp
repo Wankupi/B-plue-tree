@@ -1,4 +1,4 @@
-#include "bpt.h"
+#include "multibpt.h"
 #include <array>
 #include <chrono>
 #include <filesystem>
@@ -8,7 +8,7 @@
 #include <string>
 using namespace std;
 
-using bpt = kupi::bpt<int, int, kupi::FileCache>;
+using bpt = kupi::multibpt<int, int, kupi::FileCache>;
 
 void test_std();
 void test_input();
@@ -38,6 +38,17 @@ std::vector<int> find(std::set<std::pair<int, int>> const &s, int key) {
 		res.push_back((p++)->second);
 	return res;
 }
+
+std::vector<int> find(bpt &s, int key) {
+	std::vector<int> res;
+	auto p = s.find(key);
+	while (p != s.end() && p->first == key) {
+		res.emplace_back(p->second);
+		++p;
+	}
+	return res;
+}
+
 
 template<typename Key, typename Val>
 std::ostream &operator<<(std::ostream &os, std::set<std::pair<Key, Val>> const &v) {
@@ -70,42 +81,37 @@ void test_std() {
 			std::cout << "Case " << T << endl;
 		auto beg_time = std::chrono::system_clock::now();
 		bpt tr("03");
-		// kupi::bpt<int,int, kupi::MemoryCache> tr;
 		std::set<std::pair<int, int>> m;
 		bool fault = false;
 		std::vector<std::pair<int, std::pair<int, int>>> ops;
-		kupi::vector<int> v1;
+		std::vector<int> v1;
 		std::vector<int> v2;
 
-		try {
-			for (int i = 1; i <= n; ++i) {
-				int o = opt(e);
-				int key = x(e);
-				int value = 0;
-				if (o == 1) {
-					ops.push_back({o, {key, value}});
-					tr.insert(key, value);
-					m.insert({key, value});
-				}
-				else if (o == 2 || o == 4) {
-					ops.push_back({o, {key, value}});
-					tr.erase(key, value);
-					m.erase({key, value});
-				}
-				else {
-					ops.push_back({o, {key, 0}});
-					v1 = tr.find(key);
-					v2 = find(m, key);
-					if (std::vector<int>(v1) != v2) {
-						cout << "At Step " << i << endl;
-						fault = true;
-						break;
-					}
+		for (int i = 1; i <= n; ++i) {
+			int o = opt(e);
+			int key = x(e);
+			int value = 0;
+			if (o == 1) {
+				ops.push_back({o, {key, value}});
+				tr.insert(key, value);
+				m.insert({key, value});
+			}
+			else if (o == 2) {
+				ops.push_back({o, {key, value}});
+				tr.erase(key, value);
+				m.erase({key, value});
+			}
+			else {
+				ops.push_back({o, {key, 0}});
+				//				v1 = tr.find(key);
+				v1 = find(tr, key);
+				v2 = find(m, key);
+				if (std::vector<int>(v1) != v2) {
+					cout << "At Step " << i << endl;
+					fault = true;
+					break;
 				}
 			}
-		} catch (kupi::bpt_exception const &e) {
-			fault = true;
-			std::cout << e.what() << std::endl;
 		}
 		if (fault) {
 			for (auto [o, p]: ops) {
@@ -156,7 +162,7 @@ void test_input() {
 			// tr.debug();
 		}
 		else {
-			auto v1 = tr.find(key);
+			auto v1 = find(tr, key);
 			auto v2 = find(m, key);
 			std::cout << std::vector<int>(v1) << endl
 					  << v2 << std::endl;
