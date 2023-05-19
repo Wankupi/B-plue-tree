@@ -74,10 +74,10 @@ public:
 public:
 	bpt() = default;
 	explicit bpt(std::string const &tr_name) : nodes(tr_name + ".nodes"), leave(tr_name + ".leave") {}
-	void insert(Key const &index, Val const &val);
-	void insert(std::pair<Key, Val> const &x) { insert(x.first, x.second); }
-	void erase(Key const &index);
-	iterator find(Key const &index);
+	void insert(Key const &key, Val const &val) { insert({key, val}); }
+	void insert(std::pair<Key, Val> const &x);
+	void erase(Key const &key);
+	iterator find(Key const &key);
 	iterator end() { return {nullptr, nullptr, &leave}; }
 
 private:
@@ -95,7 +95,7 @@ private:
 	 * @param st the nodes will be stored in it
 	 * @return pointer to the leaf where x should lay in. store the chain to it in a vector
 	 */
-	leaf_ptr find_leaf(Key const &index, vector<std::pair<node_ptr, node_data *>> &st);
+	leaf_ptr find_leaf(Key const &key, vector<std::pair<node_ptr, node_data *>> &st);
 
 	/**
 	 * The following 3 methods are called in insert.
@@ -119,7 +119,7 @@ private:
 		Key const *update_key = nullptr;
 		bool is_short = false;
 	};
-	erase_result erase_leaf(leaf_ptr p, Key const &x);
+	erase_result erase_leaf(leaf_ptr p, Key const &key);
 	bool erase_node(node_ptr p, node_data *k);
 	/**
 	 * reassign* make p and q more balance.
@@ -134,13 +134,13 @@ private:
 };
 
 template<typename Key, typename Val, template<typename> class Array>
-bpt<Key, Val, Array>::iterator bpt<Key, Val, Array>::find(Key const &index) {
+bpt<Key, Val, Array>::iterator bpt<Key, Val, Array>::find(Key const &key) {
 	if (leave.empty()) return end();
-	node_data X{index, 0};
 	auto p = nodes.empty() ? nullptr : nodes[1];
 	auto ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
-		auto *k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		// cast to longer is ok because cmp_key_node will only access to `node_data::key`, i.e. `key`.
+		auto *k = lower_bound(p->data, p->data + p->header.size, *reinterpret_cast<node_data const*>(&key), cmp_key_node);
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf) {
 			ptr = leave[next];
@@ -148,21 +148,21 @@ bpt<Key, Val, Array>::iterator bpt<Key, Val, Array>::find(Key const &index) {
 		}
 		p = nodes[next];
 	}
-	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, pair{index, {}}, cmp_key_leaf);
-	if (k == ptr->data + ptr->header.size || k->first != index)
+	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, pair{key, {}}, cmp_key_leaf);
+	if (k == ptr->data + ptr->header.size || k->first != key)
 		return end();
 	return {k, ptr, &leave};
 }
 
 template<typename Key, typename Val, template<typename> class Array>
-typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(Key const &x, vector<std::pair<node_ptr, node_data *>> &st) {
+typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(Key const &key, vector<std::pair<node_ptr, node_data *>> &st) {
 	if (nodes.empty())
 		return leave[1];// tree is not empty
-	node_data X{x, 0};
 	node_ptr p = nodes[1];
 	while (true) {
-		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
-		st.push_back({p, k});
+		// cast to longer is ok because cmp_key_node will only access to `node_data::key`, i.e. `key`.
+		auto k = lower_bound(p->data, p->data + p->header.size, *reinterpret_cast<node_data const*>(&key), cmp_key_node);
+		st.emplace_back(p, k);
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf)
 			return leave[next];
@@ -172,8 +172,7 @@ typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(Key cons
 }
 
 template<typename Key, typename Val, template<typename> class Array>
-void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
-	pair x{index, val};
+void bpt<Key, Val, Array>::insert(std::pair<Key, Val> const &x) {
 	if (leave.empty()) {
 		auto [id, p] = leave.allocate();// the first id is 1
 		p->header = leaf_meta{1, 0};
@@ -181,7 +180,7 @@ void bpt<Key, Val, Array>::insert(Key const &index, Val const &val) {
 		return;
 	}
 	vector<std::pair<node_ptr, node_data *>> st;
-	auto ptr = find_leaf(index, st);
+	auto ptr = find_leaf(x.first, st);
 	auto ir = insert_leaf(ptr, x);
 	if (!ir.new_node) return;
 	for (auto cur = st.rbegin(); ir.new_node && cur != st.rend(); ++cur)
@@ -255,11 +254,11 @@ void bpt<Key, Val, Array>::insert_new_root(insert_result const &ir) {
 }
 
 template<typename Key, typename Val, template<typename> class Array>
-void bpt<Key, Val, Array>::erase(const Key &index) {
+void bpt<Key, Val, Array>::erase(const Key &key) {
 	if (leave.empty()) return;
 	vector<std::pair<node_ptr, node_data *>> st;
-	auto ptr = find_leaf(index, st);
-	auto er = erase_leaf(ptr, index);
+	auto ptr = find_leaf(key, st);
+	auto er = erase_leaf(ptr, key);
 	// deal with the change of key first
 	if (er.update_key) {
 		for (auto cur = st.rbegin(); cur != st.rend(); ++cur)
@@ -286,9 +285,9 @@ void bpt<Key, Val, Array>::erase(const Key &index) {
 }
 
 template<typename Key, typename Val, template<typename> class Array>
-typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, Key const &index) {
-	pair *k = lower_bound(p->data, p->end(), pair{index, {}}, cmp_key_leaf);
-	if (k == p->end() || k->first != index) return {};
+typename bpt<Key, Val, Array>::erase_result bpt<Key, Val, Array>::erase_leaf(leaf_ptr p, Key const &key) {
+	pair *k = lower_bound(p->data, p->end(), pair{key, {}}, cmp_key_leaf);
+	if (k == p->end() || k->first != key) return {};
 	memmove(k, k + 1, (p->end() - k - 1) * sizeof(pair));
 	--(p->header.size);
 	Key const *back = (k == p->end() ? &p->back().first : nullptr);
