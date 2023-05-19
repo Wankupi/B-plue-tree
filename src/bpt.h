@@ -52,13 +52,18 @@ public:
 		reference operator*() { return *reinterpret_cast<pointer>(ptr); }
 		pointer operator->() { return reinterpret_cast<pointer>(ptr); }
 		iterator &operator++() {
+			if (!ptr) return *this;
 			if (ptr != &p_leaf->back())
 				++ptr;
 			else {
-				p_leaf = (*leave)[p_leaf->header.next];
-				if (p_leaf) ptr = p_leaf->data;
-				else
+				if (p_leaf->header.next) {
+					p_leaf = (*leave)[p_leaf->header.next];
+					ptr = p_leaf->data;
+				}
+				else {
+					p_leaf = nullptr;
 					ptr = nullptr;
+				}
 			}
 			return *this;
 		}
