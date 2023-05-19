@@ -96,6 +96,7 @@ private:
 	using node_ptr = decltype(nodes[1]);
 	using leaf_ptr = decltype(leave[1]);
 	static bool cmp_key_node(node_data const &A, node_data const &B) { return A.key.first < B.key.first; }
+	static bool cmp_node(node_data const &A, node_data const &B) { return A.key < B.key; }
 	static bool cmp_key_leaf(pair const &A, pair const &B) { return A.first < B.first; }
 	/**
 	 * @param x key
@@ -200,7 +201,7 @@ typename multibpt<Key, Val, Array>::leaf_ptr multibpt<Key, Val, Array>::find_lea
 	node_data X{x, 0};
 	node_ptr p = nodes[1];
 	while (true) {
-		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_key_node);
+		auto k = lower_bound(p->data, p->data + p->header.size, X, cmp_node);
 		st.push_back({p, k});
 		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
 		if (p->header.is_leaf)
