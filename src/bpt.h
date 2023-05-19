@@ -140,16 +140,16 @@ bpt<Key, Val, Array>::iterator bpt<Key, Val, Array>::find(Key const &key) {
 	auto ptr = nodes.empty() ? leave[1] : nullptr;
 	while (p) {
 		// cast to longer is ok because cmp_key_node will only access to `node_data::key`, i.e. `key`.
-		auto *k = lower_bound(p->data, p->data + p->header.size, *reinterpret_cast<node_data const*>(&key), cmp_key_node);
-		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
+		auto *k = lower_bound(p->data, p->end(), *reinterpret_cast<node_data const*>(&key), cmp_key_node);
+		auto next = k == p->end() ? p->header.last_child : k->child;
 		if (p->header.is_leaf) {
 			ptr = leave[next];
 			break;
 		}
 		p = nodes[next];
 	}
-	auto k = lower_bound(ptr->data, ptr->data + ptr->header.size, pair{key, {}}, cmp_key_leaf);
-	if (k == ptr->data + ptr->header.size || k->first != key)
+	auto k = lower_bound(ptr->data, ptr->end(), pair{key, {}}, cmp_key_leaf);
+	if (k == ptr->end() || k->first != key)
 		return end();
 	return {k, ptr, &leave};
 }
@@ -161,9 +161,9 @@ typename bpt<Key, Val, Array>::leaf_ptr bpt<Key, Val, Array>::find_leaf(Key cons
 	node_ptr p = nodes[1];
 	while (true) {
 		// cast to longer is ok because cmp_key_node will only access to `node_data::key`, i.e. `key`.
-		auto k = lower_bound(p->data, p->data + p->header.size, *reinterpret_cast<node_data const*>(&key), cmp_key_node);
+		auto k = lower_bound(p->data, p->end(), *reinterpret_cast<node_data const*>(&key), cmp_key_node);
 		st.emplace_back(p, k);
-		auto next = k == p->data + p->header.size ? p->header.last_child : k->child;
+		auto next = k == p->end() ? p->header.last_child : k->child;
 		if (p->header.is_leaf)
 			return leave[next];
 		else
